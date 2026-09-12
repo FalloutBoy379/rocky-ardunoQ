@@ -14,8 +14,8 @@ cd /home/ansh/Documents/ChatGPT/Rocky
 Type a message and wait for the reply. `/reset` clears the conversation and
 `/quit` exits. No microphone or speaker is involved yet.
 
-The model server is enabled to start at boot, so there is nothing to launch
-first. If replies fail, see "When something is not answering" below.
+The model server starts at boot, so there is nothing to launch first.
+This has been verified across a real reboot. If replies fail, see "When something is not answering" below.
 
 ## How you reach Rocky
 
@@ -38,10 +38,10 @@ instead of drawing power from your laptop.
 
 Wi-Fi login is therefore the real channel, and adb is only a convenience.
 
-A `rocky` host alias lives in `~/.ssh/config` on the laptop and points at the
-board's address, `192.168.100.133`, logging in as `arduino` with your ed25519
-key. That address comes from DHCP. If the lease moves, edit that one line.
-You can open a shell directly with:
+A `rocky` host alias lives in `~/.ssh/config` on the laptop and resolves
+`rocky.local` over mDNS, logging in as `arduino` with your ed25519 key. The
+board announces that name itself through `avahi-daemon`, so a new DHCP lease
+does not break anything. You can open a shell directly with:
 
 ```bash
 ssh rocky
@@ -130,7 +130,7 @@ ssh rocky 'curl -s http://127.0.0.1:11434/api/tags'       # model server answeri
 ssh rocky 'journalctl -u rocky-ollama -n 50 --no-pager'   # what went wrong
 ```
 
-If `ssh rocky` itself fails, the board may have taken a new DHCP address.
+If `ssh rocky` fails, the board is off the network or mDNS is not answering.
 Fall back to the USB cable, which does not depend on the network:
 
 ```bash
@@ -173,18 +173,36 @@ system-wide installer. The archive retains its packaged `bin` and `lib` layout.
   `sshd` will also accept passwords from anything on the Wi-Fi network, and the
   `arduino` account may carry a default password. Worth hardening before Rocky
   lives on a desk permanently.
-- **No mDNS.** `avahi-daemon` is inactive, so `rocky.local` does not resolve and
-  the SSH alias depends on a DHCP address.
 - **Personality is weak at 0.5B.** The model frequently answers in generic
   assistant voice ("How can I assist you today?") rather than Rocky's. Model
   size and prompt both need revisiting.
-- **Boot persistence is enabled but not yet proven.** `ssh` and `rocky-ollama`
-  are both `enabled` and running, but the board has not been rebooted since.
-  Verify with `ssh -t rocky 'sudo reboot'`, wait, then
-  `ssh rocky 'systemctl is-active ssh rocky-ollama'`.
 - **No speech yet.** The ReSpeaker XVF3800 array has not been delivered. Whether
   it arrives in USB audio mode or needs reflashing from I2S firmware is
   unconfirmed and determines the first audio step.
+
+## Powering the board once the microphone is attached
+
+The UNO Q has a single USB-C connector, and it currently both carries adb and
+powers the board from your laptop. Attaching the ReSpeaker needs a USB-C
+multiport dongle with power delivery passthrough, and Arduino's documentation
+excludes Apple dongles.
+
+The power half is easy to overlook. Arduino states that when the board acts as
+a USB host, "it provides 5 V on VBUS to power a connected peripheral", so it is
+sourcing power out of that port rather than drawing power in. Plugging the
+microphone straight into the board leaves nothing powering the board.
+
+Two lower-confidence points from an Arduino forum thread, not the datasheet,
+to confirm against real hardware rather than design around:
+
+- Powering through the VIN pin does not help, because the on-board buck
+  converter for VIN reportedly supplies only the board, not the 5 V pins or the
+  USB port.
+- Booting with USB devices already attached may leave the board in device mode,
+  so peripherals may need to be plugged in after boot.
+
+SSH over Wi-Fi is unaffected by any of this. Without a dongle you keep full
+access to Rocky and simply cannot attach the microphone.
 
 ## Hardware plan
 
