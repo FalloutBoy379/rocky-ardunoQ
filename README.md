@@ -131,6 +131,34 @@ so read the replies too.
 This is the language model stage only. Speech recognition and speech synthesis
 will add to it.
 
+## Reaching Rocky from a second machine
+
+Each machine needs its own key. Generate the key **on the machine that will
+connect**, never on the board: the private half must stay on the laptop, and
+only the public half goes to Rocky. `authorized_keys` accumulates, so adding a
+machine does not remove another.
+
+On the new machine:
+
+```bash
+ssh-keygen -t ed25519          # Windows: same command in PowerShell
+cat ~/.ssh/id_ed25519.pub      # Windows: type $env:USERPROFILE\.ssh\id_ed25519.pub
+```
+
+Then on the board, paste the line and press Ctrl+D:
+
+```bash
+cat >> ~/.ssh/authorized_keys
+```
+
+Check it landed as exactly one line starting with `ssh-`. A key broken across
+two lines is silently ignored, and you get a password prompt with no
+explanation. The same applies to a line missing its `ssh-ed25519` prefix.
+
+On Windows, `adb.exe` from Google's SDK Platform Tools gives the same USB
+console as `usb-shell.sh` does on Linux. The UNO Q's USB drivers come with the
+Arduino IDE if Windows does not see the board.
+
 ## Taking Rocky to another network
 
 Rocky joins Wi-Fi on his own, but only networks he already knows. Teach him a
