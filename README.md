@@ -17,6 +17,20 @@ Type a message and wait for the reply. `/reset` clears the conversation and
 The model server starts at boot, so there is nothing to launch first.
 This has been verified across a real reboot. If replies fail, see "When something is not answering" below.
 
+## Talk to Rocky from a shell on the board
+
+Everything already runs on the UNO Q. `chat.sh` only opens a terminal there.
+To start Rocky from a shell on the board itself:
+
+```bash
+ssh rocky
+./talk
+```
+
+`talk.sh` loads the API key from `~/.rocky-env`, selects the venv Python, and
+honours the same `ROCKY_BACKEND` and `ROCKY_CLAUDE_MODEL` variables. `~/talk`
+is a symlink to the copy in `rocky-bench`, so pushing the repo updates it.
+
 ## How you reach Rocky
 
 `chat.sh` logs in over Wi-Fi by default. Two transports are available:
