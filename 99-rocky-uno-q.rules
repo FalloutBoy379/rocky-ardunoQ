@@ -1,0 +1,2 @@
+# Rocky UNO Q: grant USB device access to ansh.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="2341", ATTR{idProduct}=="0078", ATTR{serial}=="1141166421", OWNER="ansh", GROUP="ansh", MODE="0660"

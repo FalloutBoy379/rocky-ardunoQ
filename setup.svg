@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="350" viewBox="0 0 940 350">
+<rect width="940" height="350" fill="#f6f4ee"/>
+<style>text{font-family:Arial,sans-serif;fill:#20332f} .title{font-size:24px;font-weight:bold}.label{font-size:17px}.small{font-size:14px}</style>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#44695d"/></marker></defs>
+<text x="30" y="38" class="title">Rocky: today's text bench and tomorrow's audio</text>
+<rect x="30" y="75" width="210" height="105" rx="12" fill="#dce8df"/>
+<text x="48" y="104" class="label">Laptop</text><text x="48" y="130" class="small">Edit code and open</text><text x="48" y="152" class="small">the board's terminal</text>
+<path d="M240 124H298" stroke="#44695d" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="252" y="108" class="small">USB</text>
+<rect x="310" y="75" width="285" height="105" rx="12" fill="#dce8df"/>
+<text x="329" y="104" class="label">UNO Q: Linux + Python</text><text x="329" y="130" class="small">Typed input, session history,</text><text x="329" y="152" class="small">personality, printed replies</text>
+<path d="M595 124H653" stroke="#44695d" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="665" y="75" width="245" height="105" rx="12" fill="#eee0bd"/>
+<text x="681" y="104" class="label">Local model server</text><text x="681" y="130" class="small">Client code ready;</text><text x="681" y="152" class="small">model setup still pending</text>
+<rect x="310" y="231" width="285" height="85" rx="12" fill="none" stroke="#7e8b84" stroke-dasharray="6 4"/>
+<text x="329" y="259" class="label">ReSpeaker + audio pipeline</text><text x="329" y="285" class="small">Future: speech replaces typing</text>
+<path d="M452 231V188" stroke="#44695d" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow)"/>
+<text x="30" y="275" class="small">Today: manual mode works</text><text x="30" y="299" class="small">without any model or audio.</text>
+<text x="665" y="259" class="small">Later: the separate MCU</text><text x="665" y="282" class="small">controls touch, LEDs, and an arm.</text>
+</svg>
