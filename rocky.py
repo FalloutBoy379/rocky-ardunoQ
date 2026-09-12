@@ -4,6 +4,8 @@ import argparse
 import json
 import os
 import time
+
+import memory
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -55,10 +57,17 @@ EXAMPLES = [
 ]
 
 
-def build_messages(history):
+# Recent turns are resent in full on every request, so an uncapped history makes
+# cost grow with the square of the session length and eventually exhausts the
+# context window. Twenty turns is ample for conversational follow-ups; anything
+# worth keeping longer belongs in memory.py, not in the transcript.
+MAX_TURNS = 20
+
+
+def build_messages(history, facts=""):
     """Personality, then worked examples, then the live conversation."""
     return (
-        [{"role": "system", "content": PERSONALITY}]
+        [{"role": "system", "content": PERSONALITY + ("\n" + facts if facts else "")}]
         + [dict(message) for message in EXAMPLES]
         + [dict(message) for message in history]
     )
@@ -82,15 +91,15 @@ class Conversation:
         if not isinstance(answer, str) or not answer.strip():
             raise ValueError("The responder returned no text.")
         answer = answer.strip()
-        self.history = pending + [{"role": "assistant", "content": answer}]
+        self.history = (pending + [{"role": "assistant", "content": answer}])[-MAX_TURNS * 2:]
         return answer
 
 
-def ollama_reply(model, messages):
+def ollama_reply(model, messages, path=memory.DEFAULT_PATH):
     """Use only the model server on this computer's loopback interface."""
     payload = {
         "model": model,
-        "messages": build_messages(messages),
+        "messages": build_messages(messages, memory.format_for_prompt(memory.load(path))),
         "stream": False,
     }
     request = Request(
@@ -106,18 +115,86 @@ def ollama_reply(model, messages):
     return result["message"].get("content")
 
 
-def claude_reply(model, messages):
-    """Ask Claude for Rocky's next line.
+REMEMBER_TOOL = {
+    "name": "remember",
+    "description": (
+        "Save one durable fact about the person you are talking to. Use this "
+        "when they tell you something lasting about themselves, their "
+        "preferences, their projects, or people in their life, and whenever "
+        "they ask you to remember something. Do not save passing "
+        "conversational detail, questions, or things that are only true right "
+        "now. Save one short fact per call, written so it still makes sense "
+        "read on its own months later."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "fact": {
+                "type": "string",
+                "description": "The fact to remember, as one short sentence.",
+            }
+        },
+        "required": ["fact"],
+        "additionalProperties": False,
+    },
+}
+
+
+def handle_command(text, path=memory.DEFAULT_PATH):
+    """Map a typed command onto a memory operation.
+
+    Returns text to show the user, or None when this is not a memory command.
+    Deliberately separate from the input loop: a voice front end will produce
+    the same intents by other means and must not need its own copy of this.
+    """
+    text = text.strip()
+    if not text.startswith("/"):
+        return None
+    command, _, argument = text.partition(" ")
+    argument = argument.strip()
+
+    if command == "/remember":
+        if not argument:
+            return "Say what to remember, for example: /remember His sister is Priya"
+        entry = memory.add_fact(argument, path)
+        if entry is None:
+            return "Already remembered, or nothing to remember."
+        return f"Remembered ({entry['id']}): {entry['fact']}"
+
+    if command == "/memories":
+        facts = memory.load(path)
+        if not facts:
+            return "Nothing remembered yet."
+        listing = "\n".join(f"  {e['id']}. {e['fact']}" for e in facts)
+        return f"Remembered facts:\n{listing}\nRemove one with /forget <number>."
+
+    if command == "/forget":
+        if not argument.isdigit():
+            return "Say which one to forget by number, for example: /forget 3"
+        if not memory.remove_fact(int(argument), path):
+            return f"There is no memory numbered {argument}."
+        return f"Forgotten {argument}."
+
+    return None
+
+
+def claude_reply(model, messages, path=memory.DEFAULT_PATH):
+    """Ask Claude for Rocky's next line, letting him save facts as he goes.
 
     Effort is not accepted by every model. Haiku 4.5 rejects output_config
     outright, while Opus and Sonnet take an effort level, so the parameter is
     only sent where it is supported. On models that do take it, low effort is
     the documented way to buy back latency: disabling thinking on Opus 5 has
     two known failure modes, and Rocky only ever says three sentences.
+
+    When Rocky decides something is worth remembering he asks for the tool
+    instead of answering. We save the fact, hand the outcome back, and he then
+    writes his actual reply, so a remembering turn costs two round trips and
+    every other turn costs one.
     """
     import anthropic
 
-    sent = build_messages(messages)
+    sent = build_messages(messages, memory.format_for_prompt(memory.load(path)))
     # An organization-level key does not say which workspace to bill, so the
     # API asks for the workspace in a header. A key created inside a workspace
     # already carries that, and needs nothing here.
@@ -128,28 +205,57 @@ def claude_reply(model, messages):
     options = {}
     if not model.startswith("claude-haiku"):
         options["output_config"] = {"effort": "low"}
-    try:
-        response = client.messages.create(
-            model=model,
-            max_tokens=4000,
-            system=sent[0]["content"],
-            messages=sent[1:],
-            **options,
-        )
-    except anthropic.AuthenticationError:
-        raise ValueError("ANTHROPIC_API_KEY is missing or invalid on this machine.")
-    except anthropic.BadRequestError as error:
-        raise ValueError(f"The API rejected the request: {error.message}")
-    except anthropic.RateLimitError:
-        raise ValueError("Rate limited by the API. Wait a moment and try again.")
-    except anthropic.APIConnectionError:
-        raise ValueError("Could not reach the API. Check Rocky's network.")
 
-    if response.stop_reason == "refusal":
-        raise ValueError("The model declined to answer that one.")
-    return "".join(
-        block.text for block in response.content if block.type == "text"
-    )
+    conversation = sent[1:]
+    # A guard, not a workflow: Rocky should need one round of tool calls at
+    # most. Without it a model that kept asking would loop forever.
+    for _ in range(3):
+        try:
+            response = client.messages.create(
+                model=model,
+                max_tokens=4000,
+                system=sent[0]["content"],
+                messages=conversation,
+                tools=[REMEMBER_TOOL],
+                **options,
+            )
+        except anthropic.AuthenticationError:
+            raise ValueError("ANTHROPIC_API_KEY is missing or invalid on this machine.")
+        except anthropic.BadRequestError as error:
+            raise ValueError(f"The API rejected the request: {error.message}")
+        except anthropic.RateLimitError:
+            raise ValueError("Rate limited by the API. Wait a moment and try again.")
+        except anthropic.APIConnectionError:
+            raise ValueError("Could not reach the API. Check Rocky's network.")
+
+        if response.stop_reason == "refusal":
+            raise ValueError("The model declined to answer that one.")
+        if response.stop_reason != "tool_use":
+            return "".join(
+                block.text for block in response.content if block.type == "text"
+            )
+
+        results = []
+        for block in response.content:
+            if block.type != "tool_use":
+                continue
+            if block.name == "remember":
+                entry = memory.add_fact(block.input.get("fact", ""), path)
+                outcome = (
+                    f"Saved: {entry['fact']}" if entry
+                    else "Not saved; already known or empty."
+                )
+            else:
+                outcome = f"There is no tool named {block.name}."
+            results.append(
+                {"type": "tool_result", "tool_use_id": block.id, "content": outcome}
+            )
+        conversation = conversation + [
+            {"role": "assistant", "content": response.content},
+            {"role": "user", "content": results},
+        ]
+
+    raise ValueError("Rocky kept trying to save things and never answered.")
 
 
 def manual_reply(messages):
@@ -178,7 +284,9 @@ def main():
         responder = lambda messages: ollama_reply(args.model, messages)
     conversation = Conversation(responder)
     backend = "manual" if args.manual else (args.claude or args.model)
-    print(f"Rocky text bench on {backend}. /reset clears this session; /quit exits.")
+    print(f"Rocky text bench on {backend}.")
+    print("/reset clears this conversation; /quit exits.")
+    print("/remember <text>, /memories, /forget <number> manage what Rocky keeps.")
     if args.manual:
         print("MANUAL MODE: you supply both sides. No AI or audio is active.")
     while True:
@@ -191,6 +299,12 @@ def main():
                 print("Session cleared.")
                 continue
             if not text:
+                continue
+            # Command handling lives outside this loop so a voice front end can
+            # reach the same operations without a keyboard.
+            output = handle_command(text)
+            if output is not None:
+                print(output)
                 continue
             started = time.monotonic()
             answer = conversation.reply(text)
