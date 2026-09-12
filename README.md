@@ -17,6 +17,9 @@ Type a message and wait for the reply. `/reset` clears the conversation and
 The model server starts at boot, so there is nothing to launch first.
 This has been verified across a real reboot. If replies fail, see "When something is not answering" below.
 
+Starting fresh on this project? Read `docs/HANDOFF.md` for current state,
+what is verified, and what to do next.
+
 ## Talk to Rocky from a shell on the board
 
 Everything already runs on the UNO Q. `chat.sh` only opens a terminal there.
