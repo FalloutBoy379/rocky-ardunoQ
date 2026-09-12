@@ -131,6 +131,34 @@ so read the replies too.
 This is the language model stage only. Speech recognition and speech synthesis
 will add to it.
 
+## Taking Rocky to another network
+
+Rocky joins Wi-Fi on his own, but only networks he already knows. Teach him a
+new one **before** you move him, because without network there is no SSH and no
+mDNS to fix it over:
+
+```bash
+ssh -t rocky '~/rocky-bench/add-wifi.sh'
+```
+
+Run it once per network. Adding your phone's hotspot as well is cheap insurance.
+NetworkManager keeps one profile per network and joins whichever it can see, so
+a new profile does not disturb the existing one.
+
+`rocky.local` keeps working on any network, because mDNS asks the local network
+rather than relying on a fixed address.
+
+If Wi-Fi fails entirely, the USB cable needs no network at all:
+
+```bash
+ROCKY_TRANSPORT=adb ./chat.sh          # a shell, to fix the Wi-Fi
+ROCKY_BACKEND=ollama ./chat.sh         # a Rocky who works with no internet
+```
+
+Some networks block mDNS. If the board is clearly online but `ssh rocky` fails,
+read its address over the USB cable with `ip -br addr show wlan0` and put that
+in the `rocky` block of `~/.ssh/config` until you are back.
+
 ## Managing the board
 
 The model server runs as a systemd service named `rocky-ollama`, defined by
