@@ -1,6 +1,6 @@
 import unittest
 
-from rocky import Conversation
+from rocky import Conversation, FRIEND, build_messages
 
 
 class ConversationTests(unittest.TestCase):
@@ -45,6 +45,35 @@ class ConversationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             conversation.reply("Hello")
         self.assertEqual(conversation.history, [])
+
+
+class PromptTests(unittest.TestCase):
+    """A small model imitates examples far more reliably than it follows rules,
+    so the worked examples must actually reach the model, ahead of live turns."""
+
+    def test_examples_sit_between_personality_and_live_turns(self):
+        turns = [{"role": "user", "content": "Hello"}]
+        sent = build_messages(turns)
+        self.assertEqual(sent[0]["role"], "system")
+        self.assertEqual(sent[-1], turns[0])
+        self.assertGreater(len(sent), 2, "examples are missing from the prompt")
+
+    def test_examples_alternate_user_and_assistant(self):
+        sent = build_messages([])
+        roles = [message["role"] for message in sent[1:]]
+        self.assertEqual(roles, ["user", "assistant"] * (len(roles) // 2))
+
+    def test_examples_address_the_friend_by_name(self):
+        spoken = " ".join(
+            message["content"] for message in build_messages([])
+            if message["role"] == "assistant"
+        )
+        self.assertIn(FRIEND, spoken)
+
+    def test_build_messages_does_not_mutate_caller_history(self):
+        turns = [{"role": "user", "content": "Hello"}]
+        build_messages(turns)
+        self.assertEqual(turns, [{"role": "user", "content": "Hello"}])
 
 
 if __name__ == "__main__":
