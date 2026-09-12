@@ -100,6 +100,44 @@ def ollama_reply(model, messages):
     return result["message"].get("content")
 
 
+def claude_reply(model, messages):
+    """Ask Claude for Rocky's next line.
+
+    Effort is not accepted by every model. Haiku 4.5 rejects output_config
+    outright, while Opus and Sonnet take an effort level, so the parameter is
+    only sent where it is supported. On models that do take it, low effort is
+    the documented way to buy back latency: disabling thinking on Opus 5 has
+    two known failure modes, and Rocky only ever says three sentences.
+    """
+    import anthropic
+
+    sent = build_messages(messages)
+    client = anthropic.Anthropic()
+    options = {}
+    if not model.startswith("claude-haiku"):
+        options["output_config"] = {"effort": "low"}
+    try:
+        response = client.messages.create(
+            model=model,
+            max_tokens=4000,
+            system=sent[0]["content"],
+            messages=sent[1:],
+            **options,
+        )
+    except anthropic.AuthenticationError:
+        raise ValueError("ANTHROPIC_API_KEY is missing or invalid on this machine.")
+    except anthropic.RateLimitError:
+        raise ValueError("Rate limited by the API. Wait a moment and try again.")
+    except anthropic.APIConnectionError:
+        raise ValueError("Could not reach the API. Check Rocky's network.")
+
+    if response.stop_reason == "refusal":
+        raise ValueError("The model declined to answer that one.")
+    return "".join(
+        block.text for block in response.content if block.type == "text"
+    )
+
+
 def manual_reply(messages):
     print(f"[Manual test: {len(messages)} conversation messages; no model running]")
     return input("Enter a simulated Rocky reply: ")
@@ -110,10 +148,23 @@ def main():
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--manual", action="store_true", help="Test flow by typing both sides")
     mode.add_argument("--model", help="Exact name of an installed local Ollama model")
+    mode.add_argument(
+        "--claude",
+        nargs="?",
+        const="claude-haiku-4-5",
+        metavar="MODEL",
+        help="Use the Claude API. Needs ANTHROPIC_API_KEY in the environment.",
+    )
     args = parser.parse_args()
-    responder = manual_reply if args.manual else lambda messages: ollama_reply(args.model, messages)
+    if args.manual:
+        responder = manual_reply
+    elif args.claude:
+        responder = lambda messages: claude_reply(args.claude, messages)
+    else:
+        responder = lambda messages: ollama_reply(args.model, messages)
     conversation = Conversation(responder)
-    print("Rocky text bench. /reset clears this session; /quit exits.")
+    backend = "manual" if args.manual else (args.claude or args.model)
+    print(f"Rocky text bench on {backend}. /reset clears this session; /quit exits.")
     if args.manual:
         print("MANUAL MODE: you supply both sides. No AI or audio is active.")
     while True:

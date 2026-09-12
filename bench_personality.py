@@ -9,7 +9,7 @@ import re
 import sys
 import time
 
-from rocky import Conversation, ollama_reply
+from rocky import Conversation, claude_reply, ollama_reply
 
 PROMPTS = [
     "Hello Rocky.",
@@ -53,7 +53,8 @@ def score(reply):
 
 def main():
     model = sys.argv[1] if len(sys.argv) > 1 else "qwen2.5:0.5b"
-    conversation = Conversation(lambda messages: ollama_reply(model, messages))
+    backend = claude_reply if model.startswith("claude-") else ollama_reply
+    conversation = Conversation(lambda messages: backend(model, messages))
     failures = 0
     total = 0.0
     for prompt in PROMPTS:
