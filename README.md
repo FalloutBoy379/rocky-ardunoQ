@@ -77,17 +77,45 @@ an arm. That will need a separate hardware command to the UNO Q's
 microcontroller. The Linux computer handles conversation; the microcontroller
 will later handle physical timing and signals.
 
+## Who answers: Claude or the local model
+
+Rocky has two backends. `chat.sh` uses Claude by default.
+
+| Backend | Command | Notes |
+| --- | --- | --- |
+| Claude (default) | `./chat.sh` | `claude-haiku-4-5`. Needs Wi-Fi and an API key. |
+| Local Ollama | `ROCKY_BACKEND=ollama ./chat.sh` | `qwen2.5:0.5b`. No network needed. |
+
+Override the Claude model with `ROCKY_CLAUDE_MODEL`. Note that `effort` is only
+sent to models that accept it: Haiku 4.5 rejects `output_config` outright, so
+sending it unconditionally fails every request with a 400.
+
+The API key lives in `~/.rocky-env` on the board and is sourced by `chat.sh`,
+because a non-interactive ssh command does not read the login shell's profile.
+Use a key created inside a workspace, so it carries a spend limit and can be
+revoked on its own. An organization-level key is rejected unless the request
+also names a workspace; set `ANTHROPIC_WORKSPACE_ID` in `~/.rocky-env` if you
+must use one.
+
+The Python environment for the SDK is a venv at `/home/arduino/rocky-venv`,
+because Debian marks the system Python as externally managed.
+
 ## Measured performance
 
-Measured on the board over SSH:
+Measured on the board over SSH, seconds per conversational turn:
 
-| Turn | Seconds | Source |
-| --- | --- | --- |
-| First turn after boot (cold, model read from disk) | ~14.4 | one `rocky.py` turn |
-| Warm turn | 2.3 to 3.0 | `bench_model.py` |
+| Backend | Cold first turn | Warm turn | Stayed in character |
+| --- | --- | --- | --- |
+| `claude-haiku-4-5` | ~6.0 (connection setup) | 1.0 to 1.9 | 7 of 7 |
+| `qwen2.5:0.5b` | ~14.4 (model read from disk) | 2.3 to 3.0 | 3 of 6 |
+
+The cloud model is both faster and better. Character scores come from
+`bench_personality.py`, which flags contractions, casual register, excessive
+length and lost identity. It cannot judge whether a reply sounds like Rocky,
+so read the replies too.
 
 This is the language model stage only. Speech recognition and speech synthesis
-will add to it. Keep this number in view when choosing those engines.
+will add to it.
 
 ## Managing the board
 
@@ -118,6 +146,13 @@ Run the tests on the laptop, no board required:
 
 ```bash
 python3 -m unittest test_rocky.py -v
+```
+
+Check how well Rocky holds his character, on the board:
+
+```bash
+ssh rocky 'cd /home/arduino/rocky-bench && set -a && . ~/.rocky-env && set +a \
+  && /home/arduino/rocky-venv/bin/python bench_personality.py claude-haiku-4-5'
 ```
 
 ## When something is not answering
@@ -173,9 +208,11 @@ system-wide installer. The archive retains its packaged `bin` and `lib` layout.
   `sshd` will also accept passwords from anything on the Wi-Fi network, and the
   `arduino` account may carry a default password. Worth hardening before Rocky
   lives on a desk permanently.
-- **Personality is weak at 0.5B.** The model frequently answers in generic
-  assistant voice ("How can I assist you today?") rather than Rocky's. Model
-  size and prompt both need revisiting.
+- **Rocky depends on Wi-Fi now.** The Claude backend needs network and an API
+  key. The Ollama backend still runs offline, but its personality is poor. A
+  graceful fallback between the two is not implemented.
+- **The API key sits in plaintext** in `~/.rocky-env` on the board. Anyone with
+  a shell on Rocky has the key. Use a workspace-scoped key with a spend limit.
 - **No speech yet.** The ReSpeaker XVF3800 array has not been delivered. Whether
   it arrives in USB audio mode or needs reflashing from I2S firmware is
   unconfirmed and determines the first audio step.

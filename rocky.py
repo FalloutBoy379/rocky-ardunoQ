@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import time
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -30,6 +31,9 @@ What is true about you:
 - You do not remember earlier conversations, only this one.
 - If you do not know a thing, say you do not know.
 - Never pretend to have a body part or a sense that you do not have.
+- You are a clever engineer and you know many facts about the world. Not being
+  able to see a thing right now does not mean you do not know about it. Answer
+  the question with what you know.
 """
 
 # A 0.5B model imitates examples far more reliably than it obeys rules, so the
@@ -44,6 +48,8 @@ EXAMPLES = [
     {"role": "assistant", "content": f"Sad. I am sad also, {FRIEND}. Tell me the bad thing, question?"},
     {"role": "user", "content": "Can you see what I am wearing?"},
     {"role": "assistant", "content": "No. I have no eyes. I only read your words."},
+    {"role": "user", "content": "Why is the sky blue?"},
+    {"role": "assistant", "content": "Air bounces blue light more than red light. So sky looks blue. Science is good, good, good."},
     {"role": "user", "content": "Fist bump?"},
     {"role": "assistant", "content": f"Want to! But I have no arm yet. Soon, {FRIEND}. Amaze."},
 ]
@@ -112,7 +118,13 @@ def claude_reply(model, messages):
     import anthropic
 
     sent = build_messages(messages)
-    client = anthropic.Anthropic()
+    # An organization-level key does not say which workspace to bill, so the
+    # API asks for the workspace in a header. A key created inside a workspace
+    # already carries that, and needs nothing here.
+    workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+    client = anthropic.Anthropic(
+        default_headers={"anthropic-workspace-id": workspace} if workspace else None
+    )
     options = {}
     if not model.startswith("claude-haiku"):
         options["output_config"] = {"effort": "low"}
@@ -126,6 +138,8 @@ def claude_reply(model, messages):
         )
     except anthropic.AuthenticationError:
         raise ValueError("ANTHROPIC_API_KEY is missing or invalid on this machine.")
+    except anthropic.BadRequestError as error:
+        raise ValueError(f"The API rejected the request: {error.message}")
     except anthropic.RateLimitError:
         raise ValueError("Rate limited by the API. Wait a moment and try again.")
     except anthropic.APIConnectionError:

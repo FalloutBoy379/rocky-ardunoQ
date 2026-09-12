@@ -18,6 +18,7 @@ PROMPTS = [
     "Can you see me right now?",
     "Fist bump?",
     "Explain why the sky is blue.",
+    "How far away is the moon?",
 ]
 
 CONTRACTIONS = re.compile(
