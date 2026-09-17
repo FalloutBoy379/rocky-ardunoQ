@@ -53,6 +53,12 @@ FOLLOWUP_SECONDS = 8.0
 # the microphone muted for that long after the last sample goes out.
 UNMUTE_DELAY = 0.4
 
+# Audio to have in hand before playback starts, and how much ALSA should hold.
+# Measured underrun without these: "underrun!!! (at least 123.931 ms long)",
+# audible as a stutter mid-sentence.
+PREROLL = 0.4
+PLAYBACK_BUFFER = 0.5
+
 # The small Vosk model has no proper nouns. These are what it hears when
 # someone says the friend's name, measured on synthetic speech and on the
 # desk. Only applied to the first word of an utterance, where a name is a
@@ -411,22 +417,54 @@ class PiperSpeaker:
         self.device = device
         self.rate = self.voice.config.sample_rate
 
-    def say(self, text):
-        player = subprocess.Popen(
+    def _player(self):
+        return subprocess.Popen(
             [
                 "aplay", "-q", "-D", self.device, "-t", "raw",
                 "-f", "S16_LE", "-r", str(self.rate), "-c", "1",
+                # A larger ALSA buffer absorbs a scheduling hiccup. The default
+                # is small enough that competing with the recogniser for four
+                # cores was emptying it mid-word.
+                "-B", str(int(PLAYBACK_BUFFER * 1_000_000)),
             ],
             stdin=subprocess.PIPE,
         )
+
+    def say(self, text):
+        """Synthesise and play, holding a head start back before starting.
+
+        Piper runs about 1.8x realtime here, so it can keep ahead of playback,
+        but it cannot start ahead of it: aplay begins draining the moment the
+        first bytes arrive. Accumulating a little audio first turns a race into
+        a margin, at the cost of delaying the first word by the time it takes
+        to synthesise that much.
+        """
+        preroll_bytes = int(self.rate * 2 * PREROLL)
+        player = None
+        pending = []
+        pending_bytes = 0
         try:
             for sentence in sentences(text):
                 for chunk in self.voice.synthesize(sentence, self.config):
-                    player.stdin.write(chunk.audio_int16_bytes)
+                    data = chunk.audio_int16_bytes
+                    if player is not None:
+                        player.stdin.write(data)
+                        continue
+                    pending.append(data)
+                    pending_bytes += len(data)
+                    if pending_bytes >= preroll_bytes:
+                        player = self._player()
+                        player.stdin.write(b"".join(pending))
+                        pending = []
+            if player is None:
+                # Shorter than the head start; nothing to race against.
+                player = self._player()
+                if pending:
+                    player.stdin.write(b"".join(pending))
             player.stdin.close()
             player.wait()
         finally:
-            if player.poll() is None:
+            if player is not None and player.poll() is None:
                 player.kill()
 
 
