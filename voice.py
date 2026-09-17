@@ -409,7 +409,13 @@ class OfflineListener:
 class PiperSpeaker:
     """Piper held in memory, playing each sentence as soon as it exists."""
 
-    def __init__(self, voice_path, device="plughw:0,0", length_scale=1.1):
+    def __init__(self, voice_path, device="plughw:0,0", length_scale=0.9):
+        """length_scale stretches phoneme durations: below 1 is quicker.
+
+        Chosen by ear at 0.9. It is not a playback speed change, so pitch is
+        unaffected; the model simply generates shorter durations. Rocky reads
+        as eager at this pacing, which suits someone delighted to be talking.
+        """
         from piper import PiperVoice, SynthesisConfig
 
         self.voice = PiperVoice.load(voice_path)
@@ -564,7 +570,9 @@ def main():
                         help="Silero VAD model, used in front of whole-utterance recognisers")
     parser.add_argument("--hotwords", default=None,
                         help="sherpa-onnx hotwords file, to bias names the model does not know")
-    parser.add_argument("--voice", default="/home/arduino/models/en_US-ryan-low.onnx",
+    parser.add_argument("--length-scale", type=float, default=0.9,
+                        help="phoneme duration multiplier; below 1 is quicker")
+    parser.add_argument("--voice", default="/home/arduino/models/en_US-mike-medium.onnx",
                         help="Piper voice, or 'espeak' for the robotic fallback")
     parser.add_argument("--wake", default="rocky",
                         help="Word that addresses Rocky; 'none' answers everything")
@@ -585,7 +593,11 @@ def main():
         print(time.strftime("%H:%M:%S"), line, flush=True)
 
     log("Loading voice...")
-    speaker = EspeakSpeaker(args.playback) if args.voice == "espeak" else PiperSpeaker(args.voice, args.playback)
+    speaker = (
+        EspeakSpeaker(args.playback)
+        if args.voice == "espeak"
+        else PiperSpeaker(args.voice, args.playback, args.length_scale)
+    )
     log("Loading recogniser...")
     microphone = Microphone(args.capture).start()
     if os.path.exists(os.path.join(args.asr, "preprocess.onnx")) or "whisper" in args.asr:

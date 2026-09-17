@@ -7,6 +7,7 @@
 # ROCKY_ASR     recogniser model directory: Whisper or Moonshine (via sherpa-onnx,
 #               behind a VAD), a sherpa-onnx streaming transducer, or a Vosk model
 # ROCKY_VOLUME  playback level 0 to 60, set on every start
+# ROCKY_PACE    phoneme duration multiplier; below 1 makes Rocky quicker
 set -eu
 
 ROCKY_DIR=${ROCKY_DIR:-/home/arduino/rocky-bench}
@@ -14,7 +15,10 @@ ROCKY_VENV=${ROCKY_VENV:-/home/arduino/rocky-venv}
 ROCKY_BACKEND=${ROCKY_BACKEND:-claude}
 ROCKY_MODEL=${ROCKY_MODEL:-qwen2.5:0.5b}
 ROCKY_CLAUDE_MODEL=${ROCKY_CLAUDE_MODEL:-claude-haiku-4-5}
-ROCKY_VOICE=${ROCKY_VOICE:-/home/arduino/models/en_US-ryan-low.onnx}
+# Chosen by ear from an eight-voice audition of Piper's medium tier. The high
+# tier is unusable on this board: 0.21x to 0.28x realtime against mike's 1.8x.
+ROCKY_VOICE=${ROCKY_VOICE:-/home/arduino/models/en_US-mike-medium.onnx}
+ROCKY_PACE=${ROCKY_PACE:-0.9}
 ROCKY_WAKE=${ROCKY_WAKE:-rocky}
 # Moonshine over Whisper tiny, measured on real desk utterances: more accurate
 # and about 2.3x faster to decode (0.6s against 1.4s), which comes straight off
@@ -53,11 +57,13 @@ case "$ROCKY_BACKEND" in
       exit 1
     fi
     exec "$ROCKY_VENV/bin/python" voice.py --claude "$ROCKY_CLAUDE_MODEL" \
-      --voice "$ROCKY_VOICE" --wake "$ROCKY_WAKE" --asr "$ROCKY_ASR" "$@"
+      --voice "$ROCKY_VOICE" --wake "$ROCKY_WAKE" --asr "$ROCKY_ASR" \
+      --length-scale "$ROCKY_PACE" "$@"
     ;;
   ollama)
     exec "$ROCKY_VENV/bin/python" voice.py --model "$ROCKY_MODEL" \
-      --voice "$ROCKY_VOICE" --wake "$ROCKY_WAKE" --asr "$ROCKY_ASR" "$@"
+      --voice "$ROCKY_VOICE" --wake "$ROCKY_WAKE" --asr "$ROCKY_ASR" \
+      --length-scale "$ROCKY_PACE" "$@"
     ;;
   *)
     echo "listen.sh: ROCKY_BACKEND must be 'claude' or 'ollama', got '$ROCKY_BACKEND'" >&2

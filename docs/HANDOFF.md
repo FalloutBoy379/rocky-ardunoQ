@@ -56,6 +56,11 @@ on both terminals, which confirms from the device itself that its echo
 cancellation applies to audio played through it. Play Rocky's voice anywhere
 else and he will hear himself.
 
+Rocky speaks as `en_US-mike-medium` at length_scale 0.9, picked by ear from
+eight male voices. Piper's high tier is unusable on this board at 0.21x to
+0.28x realtime; every medium voice runs 1.6x to 2.3x. Do not re-litigate this
+without listening: `audition.py` plays the shortlist, `--time` reports speed.
+
 Speech models live in `/home/arduino/models`: Silero VAD, sherpa-onnx streaming
 Zipformer in two sizes, Moonshine tiny, and Piper `en_US-ryan-low`. They are not
 in git; a rebuilt board needs them downloaded again.

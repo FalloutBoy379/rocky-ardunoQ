@@ -17,6 +17,11 @@ after he finishes you can reply without saying his name again, because
 conversations have follow-ups. Speech recognition and synthesis both run on the
 board; only the language model uses the network.
 
+His voice is `en_US-mike-medium` at `ROCKY_PACE=0.9`, chosen by ear from an
+eight-voice audition (`audition.py`). Piper's high tier sounds better but is
+unusable here, running at 0.21x to 0.28x realtime against mike's 1.8x, so Rocky
+would take half a minute to finish a sentence.
+
 Playback volume is set on every start from `ROCKY_VOLUME` (default 45 of 60,
 which is -15 dB and audible across a desk), because ALSA does not remember
 levels across a reboot. The array's amplifier does 10 W into 4 ohm and the
@@ -55,6 +60,11 @@ Say "Rocky" to get his attention, then talk normally. For about eight seconds
 after he finishes you can reply without saying his name again, because
 conversations have follow-ups. Speech recognition and synthesis both run on the
 board; only the language model uses the network.
+
+His voice is `en_US-mike-medium` at `ROCKY_PACE=0.9`, chosen by ear from an
+eight-voice audition (`audition.py`). Piper's high tier sounds better but is
+unusable here, running at 0.21x to 0.28x realtime against mike's 1.8x, so Rocky
+would take half a minute to finish a sentence.
 
 Playback volume is set on every start from `ROCKY_VOLUME` (default 45 of 60,
 which is -15 dB and audible across a desk), because ALSA does not remember
