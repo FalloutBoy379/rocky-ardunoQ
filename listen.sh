@@ -1,0 +1,47 @@
+#!/bin/sh
+# Run this ON Rocky. Starts the voice loop: microphone in, speaker out.
+# talk.sh is the typed equivalent and takes the same variables.
+#
+# ROCKY_VOICE   Piper voice file, or "espeak" for the instant robotic fallback
+# ROCKY_WAKE    word that addresses Rocky, or "none" to answer everything
+# ROCKY_ASR     recogniser model directory: Whisper or Moonshine (via sherpa-onnx,
+#               behind a VAD), a sherpa-onnx streaming transducer, or a Vosk model
+set -eu
+
+ROCKY_DIR=${ROCKY_DIR:-/home/arduino/rocky-bench}
+ROCKY_VENV=${ROCKY_VENV:-/home/arduino/rocky-venv}
+ROCKY_BACKEND=${ROCKY_BACKEND:-claude}
+ROCKY_MODEL=${ROCKY_MODEL:-qwen2.5:0.5b}
+ROCKY_CLAUDE_MODEL=${ROCKY_CLAUDE_MODEL:-claude-haiku-4-5}
+ROCKY_VOICE=${ROCKY_VOICE:-/home/arduino/models/en_US-ryan-low.onnx}
+ROCKY_WAKE=${ROCKY_WAKE:-rocky}
+ROCKY_ASR=${ROCKY_ASR:-/home/arduino/models/sherpa-onnx-whisper-tiny.en}
+
+if [ -f "$HOME/.rocky-env" ]; then
+  set -a
+  . "$HOME/.rocky-env"
+  set +a
+fi
+
+cd "$ROCKY_DIR"
+
+# Vosk and Piper live in the venv, so both backends run through it here.
+case "$ROCKY_BACKEND" in
+  claude)
+    if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+      echo "listen.sh: no ANTHROPIC_API_KEY. Put it in ~/.rocky-env, or run" >&2
+      echo "           ROCKY_BACKEND=ollama listen.sh to use the local model." >&2
+      exit 1
+    fi
+    exec "$ROCKY_VENV/bin/python" voice.py --claude "$ROCKY_CLAUDE_MODEL" \
+      --voice "$ROCKY_VOICE" --wake "$ROCKY_WAKE" --asr "$ROCKY_ASR" "$@"
+    ;;
+  ollama)
+    exec "$ROCKY_VENV/bin/python" voice.py --model "$ROCKY_MODEL" \
+      --voice "$ROCKY_VOICE" --wake "$ROCKY_WAKE" --asr "$ROCKY_ASR" "$@"
+    ;;
+  *)
+    echo "listen.sh: ROCKY_BACKEND must be 'claude' or 'ollama', got '$ROCKY_BACKEND'" >&2
+    exit 2
+    ;;
+esac

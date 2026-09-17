@@ -3,7 +3,33 @@ import unittest
 from pathlib import Path
 
 import memory
-from rocky import MAX_TURNS, Conversation, FRIEND, build_messages, handle_command
+from rocky import (
+    MAX_TURNS, Conversation, FRIEND, build_messages, claude_reply, handle_command,
+)
+
+
+class Block:
+    def __init__(self, **fields):
+        self.__dict__.update(fields)
+
+
+class Response:
+    def __init__(self, stop_reason, *content):
+        self.stop_reason = stop_reason
+        self.content = list(content)
+
+
+class FakeClient:
+    """Plays back scripted API responses and records what was sent."""
+
+    def __init__(self, *responses):
+        self.responses = list(responses)
+        self.requests = []
+        self.messages = self
+
+    def create(self, **request):
+        self.requests.append(request)
+        return self.responses.pop(0)
 
 
 class ConversationTests(unittest.TestCase):
@@ -104,6 +130,58 @@ class MemoryPromptTests(unittest.TestCase):
 
     def test_no_facts_leaves_the_prompt_unchanged(self):
         self.assertEqual(build_messages([])[0], build_messages([], facts="")[0])
+
+
+class RememberToolTests(unittest.TestCase):
+    """Rocky often answers and saves in the same breath. Both must survive."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = Path(self.dir.name) / "memory.json"
+
+    def tearDown(self):
+        self.dir.cleanup()
+
+    def test_words_spoken_before_the_tool_call_are_not_lost(self):
+        client = FakeClient(
+            Response(
+                "tool_use",
+                Block(type="text", text="Your name is Keval. I know this."),
+                Block(type="tool_use", id="t1", name="remember",
+                      input={"fact": "His name is Keval"}),
+            ),
+            Response("end_turn"),
+        )
+        answer = claude_reply("claude-haiku-4-5", [{"role": "user", "content": "What is my name?"}],
+                              self.path, client=client)
+        self.assertEqual(answer, "Your name is Keval. I know this.")
+        self.assertEqual([e["fact"] for e in memory.load(self.path)], ["His name is Keval"])
+
+    def test_words_from_both_rounds_are_joined(self):
+        client = FakeClient(
+            Response(
+                "tool_use",
+                Block(type="text", text="Sunny. Good."),
+                Block(type="tool_use", id="t1", name="remember", input={"fact": "It is sunny"}),
+            ),
+            Response("end_turn", Block(type="text", text="I will remember, Keval.")),
+        )
+        answer = claude_reply("claude-haiku-4-5", [{"role": "user", "content": "It is sunny."}],
+                              self.path, client=client)
+        self.assertEqual(answer, "Sunny. Good. I will remember, Keval.")
+
+    def test_tool_outcome_goes_back_to_the_model(self):
+        client = FakeClient(
+            Response("tool_use", Block(type="tool_use", id="t1", name="remember",
+                                       input={"fact": "His sister is Priya"})),
+            Response("end_turn", Block(type="text", text="Priya. Good name.")),
+        )
+        claude_reply("claude-haiku-4-5", [{"role": "user", "content": "My sister is Priya."}],
+                     self.path, client=client)
+        last = client.requests[-1]["messages"][-1]
+        self.assertEqual(last["role"], "user")
+        self.assertEqual(last["content"][0]["tool_use_id"], "t1")
+        self.assertIn("Priya", last["content"][0]["content"])
 
 
 class CommandTests(unittest.TestCase):

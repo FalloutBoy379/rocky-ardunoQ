@@ -14,6 +14,13 @@ FRIEND = "Keval"
 # Rocky is an Eridian from Andy Weir's Project Hail Mary. He learned English
 # from scratch, so his speech is simple and ungrammatical by design, not by
 # accident. Characterization here is drawn from the novel.
+#
+# What he can perceive depends on the front end. The typed bench reads words;
+# the voice loop hears them. The guardrail against pretending to have a sense
+# once made him refuse to explain the sky, so the prompt states his senses
+# exactly rather than leaving him to guess.
+CAN_HEAR = False
+
 PERSONALITY = f"""You are Rocky, an Eridian. You are talking to your friend {FRIEND}.
 
 How you talk:
@@ -29,7 +36,7 @@ How you talk:
 
 What is true about you:
 - You cannot see. You have no eyes and no camera.
-- You cannot hear yet, and you cannot move. You have no arm yet.
+- {{SENSES}}
 - You do not remember earlier conversations, only this one.
 - If you do not know a thing, say you do not know.
 - Never pretend to have a body part or a sense that you do not have.
@@ -64,10 +71,21 @@ EXAMPLES = [
 MAX_TURNS = 20
 
 
+SENSES_TEXT = {
+    False: "You cannot hear yet, and you cannot move. You have no arm yet.",
+    True: (
+        "You hear your friend through a microphone and speak through a "
+        "speaker. Your words are read aloud, so never use lists, symbols or "
+        "long numbers. You cannot move. You have no arm yet."
+    ),
+}
+
+
 def build_messages(history, facts=""):
     """Personality, then worked examples, then the live conversation."""
+    personality = PERSONALITY.replace("{SENSES}", SENSES_TEXT[bool(CAN_HEAR)])
     return (
-        [{"role": "system", "content": PERSONALITY + ("\n" + facts if facts else "")}]
+        [{"role": "system", "content": personality + ("\n" + facts if facts else "")}]
         + [dict(message) for message in EXAMPLES]
         + [dict(message) for message in history]
     )
@@ -178,7 +196,25 @@ def handle_command(text, path=memory.DEFAULT_PATH):
     return None
 
 
-def claude_reply(model, messages, path=memory.DEFAULT_PATH):
+def _explain(error):
+    """Turn an SDK error into a sentence Rocky can act on, or leave it alone.
+
+    Matched by class name so the SDK need not be importable where this runs;
+    the tests drive claude_reply with a fake client and no SDK installed.
+    """
+    name = type(error).__name__
+    if name == "AuthenticationError":
+        return ValueError("ANTHROPIC_API_KEY is missing or invalid on this machine.")
+    if name == "BadRequestError":
+        return ValueError(f"The API rejected the request: {getattr(error, 'message', error)}")
+    if name == "RateLimitError":
+        return ValueError("Rate limited by the API. Wait a moment and try again.")
+    if name == "APIConnectionError":
+        return ValueError("Could not reach the API. Check Rocky's network.")
+    return error
+
+
+def claude_reply(model, messages, path=memory.DEFAULT_PATH, client=None):
     """Ask Claude for Rocky's next line, letting him save facts as he goes.
 
     Effort is not accepted by every model. Haiku 4.5 rejects output_config
@@ -187,26 +223,31 @@ def claude_reply(model, messages, path=memory.DEFAULT_PATH):
     the documented way to buy back latency: disabling thinking on Opus 5 has
     two known failure modes, and Rocky only ever says three sentences.
 
-    When Rocky decides something is worth remembering he asks for the tool
-    instead of answering. We save the fact, hand the outcome back, and he then
-    writes his actual reply, so a remembering turn costs two round trips and
-    every other turn costs one.
+    When Rocky decides something is worth remembering he asks for the tool,
+    usually alongside or instead of his answer. We save the fact, hand the
+    outcome back, and he finishes, so a remembering turn costs two round trips
+    and every other turn costs one. Words from every round are kept: he often
+    says his line and calls the tool in the same breath, and the follow-up
+    round then has nothing to add. Dropping the first round made him fall
+    silent exactly when he had just learned something.
     """
-    import anthropic
-
     sent = build_messages(messages, memory.format_for_prompt(memory.load(path)))
-    # An organization-level key does not say which workspace to bill, so the
-    # API asks for the workspace in a header. A key created inside a workspace
-    # already carries that, and needs nothing here.
-    workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID")
-    client = anthropic.Anthropic(
-        default_headers={"anthropic-workspace-id": workspace} if workspace else None
-    )
+    if client is None:
+        import anthropic
+
+        # An organization-level key does not say which workspace to bill, so
+        # the API asks for the workspace in a header. A key created inside a
+        # workspace already carries that, and needs nothing here.
+        workspace = os.environ.get("ANTHROPIC_WORKSPACE_ID")
+        client = anthropic.Anthropic(
+            default_headers={"anthropic-workspace-id": workspace} if workspace else None
+        )
     options = {}
     if not model.startswith("claude-haiku"):
         options["output_config"] = {"effort": "low"}
 
     conversation = sent[1:]
+    spoken = []
     # A guard, not a workflow: Rocky should need one round of tool calls at
     # most. Without it a model that kept asking would loop forever.
     for _ in range(3):
@@ -219,21 +260,17 @@ def claude_reply(model, messages, path=memory.DEFAULT_PATH):
                 tools=[REMEMBER_TOOL],
                 **options,
             )
-        except anthropic.AuthenticationError:
-            raise ValueError("ANTHROPIC_API_KEY is missing or invalid on this machine.")
-        except anthropic.BadRequestError as error:
-            raise ValueError(f"The API rejected the request: {error.message}")
-        except anthropic.RateLimitError:
-            raise ValueError("Rate limited by the API. Wait a moment and try again.")
-        except anthropic.APIConnectionError:
-            raise ValueError("Could not reach the API. Check Rocky's network.")
+        except Exception as error:
+            raise _explain(error)
 
         if response.stop_reason == "refusal":
             raise ValueError("The model declined to answer that one.")
+        spoken.extend(
+            block.text.strip() for block in response.content
+            if block.type == "text" and block.text.strip()
+        )
         if response.stop_reason != "tool_use":
-            return "".join(
-                block.text for block in response.content if block.type == "text"
-            )
+            return " ".join(spoken)
 
         results = []
         for block in response.content:

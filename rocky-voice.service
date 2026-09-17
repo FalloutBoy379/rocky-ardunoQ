@@ -1,0 +1,24 @@
+# Rocky's voice loop, started at boot so he is listening when the desk wakes.
+# Install: sudo cp rocky-voice.service /etc/systemd/system/ && sudo systemctl enable --now rocky-voice
+# Logs:    journalctl -u rocky-voice -f
+#
+# Wants network for the Claude backend, but does not require it: with no
+# network the loop still starts, and every turn is a spoken apology until the
+# network returns. That is the intended degraded state rather than a silent
+# Rocky. The array's firmware and the USB host controller must both be settled
+# before capture opens, hence the short delay.
+[Unit]
+Description=Rocky voice loop
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+User=arduino
+WorkingDirectory=/home/arduino/rocky-bench
+ExecStartPre=/bin/sleep 5
+ExecStart=/home/arduino/rocky-bench/listen.sh --no-greeting
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
