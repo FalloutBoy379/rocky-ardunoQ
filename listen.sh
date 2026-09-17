@@ -16,7 +16,11 @@ ROCKY_MODEL=${ROCKY_MODEL:-qwen2.5:0.5b}
 ROCKY_CLAUDE_MODEL=${ROCKY_CLAUDE_MODEL:-claude-haiku-4-5}
 ROCKY_VOICE=${ROCKY_VOICE:-/home/arduino/models/en_US-ryan-low.onnx}
 ROCKY_WAKE=${ROCKY_WAKE:-rocky}
-ROCKY_ASR=${ROCKY_ASR:-/home/arduino/models/sherpa-onnx-whisper-tiny.en}
+# Moonshine over Whisper tiny, measured on real desk utterances: more accurate
+# and about 2.3x faster to decode (0.6s against 1.4s), which comes straight off
+# every reply. Whisper also invents captions like "(door closes)" from room
+# noise, which clean_transcript then has to throw away.
+ROCKY_ASR=${ROCKY_ASR:-/home/arduino/models/sherpa-onnx-moonshine-tiny-en-int8}
 
 # ALSA does not remember its levels across a reboot, so Rocky would otherwise
 # start at whatever was last stored. 45 of 60 is -15 dB, measured audible

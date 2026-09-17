@@ -36,6 +36,16 @@ class WakeWordTests(unittest.TestCase):
     def test_utterance_without_wake_word_is_ignored(self):
         self.assertIsNone(addressed("what time is it", "rocky"))
 
+    def test_recogniser_misspellings_still_wake_him(self):
+        """Measured on the desk: Moonshine writes "knocky" for a soft initial."""
+        self.assertEqual(addressed("knocky what are you up to", "rocky"),
+                         "what are you up to")
+
+    def test_ordinary_words_that_merely_rhyme_do_not_wake_him(self):
+        """Whisper heard "lucky". Accepting real words would wake him in the
+        middle of a conversation he was not part of."""
+        self.assertIsNone(addressed("lucky i finished it early", "rocky"))
+
     def test_wake_word_is_stripped_wherever_it_sits(self):
         self.assertEqual(addressed("rocky what time is it", "rocky"), "what time is it")
         self.assertEqual(addressed("hey rocky what time is it", "rocky"), "what time is it")

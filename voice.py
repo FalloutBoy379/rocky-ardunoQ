@@ -67,7 +67,10 @@ NAME_FIXUPS = {
 
 # What speech recognisers make of the wake word. Whisper writes "Roki?",
 # Vosk "rocky"; either is the friend calling him.
-WAKE_SPELLINGS = ("rocky", "roki", "rockie", "rocki", "rockey", "rocke")
+# What recognisers make of the wake word. "knocky" is what Moonshine writes when
+# the initial consonant is soft. Only non-words belong here: adding a real word
+# like "lucky" would wake him in the middle of ordinary conversation.
+WAKE_SPELLINGS = ("rocky", "roki", "rockie", "rocki", "rockey", "rocke", "knocky")
 
 NUMBER_WORDS = {
     word: index

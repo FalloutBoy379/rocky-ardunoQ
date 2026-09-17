@@ -118,6 +118,12 @@ exercised against a real loudspeaker in the room.
   checks contractions, register, length and lost identity. Its first version
   reported 5 of 6 on output a human would have called four failures. Read the
   replies, do not trust the number alone.
+- **Whisper tiny is not good enough for this room, Moonshine is.** Measured on
+  real desk utterances: "Rocky, what are you up to?" became "rocky, what I have
+  to" on Whisper and "Rocky, what are you up" on Moonshine, and Moonshine
+  decodes in 0.6s against Whisper's 1.4s. Whisper also invents captions from
+  room noise. The audio was fine in both cases (peaks 21-25k, no clipping,
+  speech starting 0.03s in), so suspect the recogniser before the microphone.
 - **A 0.5B model cannot hold a persona.** This was measured, not assumed. Do not
   spend time prompt-engineering the local model back to parity.
 - **Model families differ in accepted parameters.** Haiku 4.5 rejects
