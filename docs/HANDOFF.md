@@ -26,7 +26,7 @@ voice loop is reliable.
 | --- | --- |
 | Arduino UNO Q, 4 GB / 32 GB | Working. Debian 13, kernel 6.16.7, 4 cores. |
 | ReSpeaker Flex XVF3800, 4-mic | Working. Enumerated as USB audio with no firmware change. |
-| Dayton Audio DMA45-4 speaker | Not yet driven. Headphones used so far. |
+| Dayton Audio DMA45-4 speaker | Working, from the array's JST connector. |
 | Powered USB-C dongle | In use. The board runs as a USB host through it. |
 
 **The single most important constraint.** The UNO Q has one USB-C port. It is
@@ -106,9 +106,11 @@ Verified by running it:
   fix was naming the excluded categories explicitly rather than describing them
   abstractly.
 
-**Not verified.** The Dayton speaker has never been driven; all audio so far has
-gone through headphones. Whether the 3.5 mm jack and the JST speaker output can
-be active simultaneously is undocumented by Seeed and untested.
+**Not verified.** Whether the 3.5 mm jack and the JST speaker output can be
+active simultaneously is undocumented by Seeed and untested. Nor is it known
+whether Rocky triggers on his own voice now that he has a speaker rather than
+headphones: the array's echo canceller and the software mute have never been
+exercised against a real loudspeaker in the room.
 
 ## Things that will bite
 
@@ -132,12 +134,11 @@ be active simultaneously is undocumented by Seeed and untested.
 
 ## Open, in rough priority order
 
-1. Drive the Dayton speaker. It is 4 ohm, 10 W RMS, and the array's amplifier
-   does up to 10 W at 4 ohm, so full volume is the driver's limit with no
-   margin. Cap the volume in software. The 12 V external input is not needed:
-   at 79 dB per watt at one metre, a tenth of a watt is louder than
-   conversation.
-2. A/B channels 0 and 1 against real speech to confirm the listening channel.
+1. Confirm Rocky does not answer himself now that he has a loudspeaker. This is
+   the hard product requirement and the one thing the speaker changes.
+2. Volume is set on every start by `ROCKY_VOLUME` (45 of 60, -15 dB). The 12 V
+   external input is not needed: at 79 dB per watt at one metre, a tenth of a
+   watt is louder than conversation.
 3. Password SSH is still enabled on the board, and an API key plus personal
    facts about Keval now sit in plaintext on it.
 4. No automatic fallback between the Claude and Ollama backends.

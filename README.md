@@ -17,6 +17,12 @@ after he finishes you can reply without saying his name again, because
 conversations have follow-ups. Speech recognition and synthesis both run on the
 board; only the language model uses the network.
 
+Playback volume is set on every start from `ROCKY_VOLUME` (default 45 of 60,
+which is -15 dB and audible across a desk), because ALSA does not remember
+levels across a reboot. The array's amplifier does 10 W into 4 ohm and the
+DMA45-4 is rated 10 W RMS, so the top of the range is the driver's limit with
+no margin.
+
 Audio goes in and out through the ReSpeaker array, never the board's own codec.
 That is not a preference: the array cancels echo only against audio it played
 itself, so routing his voice elsewhere makes him hear and answer himself.
@@ -49,6 +55,12 @@ Say "Rocky" to get his attention, then talk normally. For about eight seconds
 after he finishes you can reply without saying his name again, because
 conversations have follow-ups. Speech recognition and synthesis both run on the
 board; only the language model uses the network.
+
+Playback volume is set on every start from `ROCKY_VOLUME` (default 45 of 60,
+which is -15 dB and audible across a desk), because ALSA does not remember
+levels across a reboot. The array's amplifier does 10 W into 4 ohm and the
+DMA45-4 is rated 10 W RMS, so the top of the range is the driver's limit with
+no margin.
 
 Audio goes in and out through the ReSpeaker array, never the board's own codec.
 That is not a preference: the array cancels echo only against audio it played
@@ -331,9 +343,9 @@ system-wide installer. The archive retains its packaged `bin` and `lib` layout.
   graceful fallback between the two is not implemented.
 - **The API key sits in plaintext** in `~/.rocky-env` on the board. Anyone with
   a shell on Rocky has the key. Use a workspace-scoped key with a spend limit.
-- **The Dayton speaker has never been driven.** All audio so far has gone
-  through headphones on the array's 3.5 mm jack. Whether that jack and the JST
-  speaker output work at the same time is undocumented and untested.
+- **Headphone and speaker at the same time is still untested.** The Dayton works
+  from the JST connector; whether the 3.5 mm jack stays live alongside it is
+  undocumented by Seeed and has not been tried.
 - **The listening channel was wrong until 2026-09-16.** `voice.py` used capture
   channel 0; measured against speech, channel 1 is clearly better and is now
   the default. Based on one utterance across three recognisers, so worth

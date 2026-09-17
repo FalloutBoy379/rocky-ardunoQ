@@ -6,6 +6,7 @@
 # ROCKY_WAKE    word that addresses Rocky, or "none" to answer everything
 # ROCKY_ASR     recogniser model directory: Whisper or Moonshine (via sherpa-onnx,
 #               behind a VAD), a sherpa-onnx streaming transducer, or a Vosk model
+# ROCKY_VOLUME  playback level 0 to 60, set on every start
 set -eu
 
 ROCKY_DIR=${ROCKY_DIR:-/home/arduino/rocky-bench}
@@ -17,6 +18,14 @@ ROCKY_VOICE=${ROCKY_VOICE:-/home/arduino/models/en_US-ryan-low.onnx}
 ROCKY_WAKE=${ROCKY_WAKE:-rocky}
 ROCKY_ASR=${ROCKY_ASR:-/home/arduino/models/sherpa-onnx-whisper-tiny.en}
 
+# ALSA does not remember its levels across a reboot, so Rocky would otherwise
+# start at whatever was last stored. 45 of 60 is -15 dB, measured audible
+# across a desk. The array's amplifier does 10 W into 4 ohm and the DMA45-4 is
+# rated 10 W RMS, so there is no headroom at the top of the range: raise this
+# knowingly, not by reflex.
+ROCKY_VOLUME=${ROCKY_VOLUME:-45}
+ROCKY_CARD=${ROCKY_CARD:-0}
+
 if [ -f "$HOME/.rocky-env" ]; then
   set -a
   . "$HOME/.rocky-env"
@@ -24,6 +33,12 @@ if [ -f "$HOME/.rocky-env" ]; then
 fi
 
 cd "$ROCKY_DIR"
+
+# Both outputs: PCM,0 is the stereo jack and PCM,1 the mono speaker amplifier.
+# Failure here is not fatal; a Rocky at the wrong volume beats no Rocky.
+for output in 0 1; do
+  amixer -c "$ROCKY_CARD" -q sset "PCM,$output" "$ROCKY_VOLUME" unmute 2>/dev/null || true
+done
 
 # Vosk and Piper live in the venv, so both backends run through it here.
 case "$ROCKY_BACKEND" in
