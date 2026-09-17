@@ -334,9 +334,10 @@ system-wide installer. The archive retains its packaged `bin` and `lib` layout.
 - **The Dayton speaker has never been driven.** All audio so far has gone
   through headphones on the array's 3.5 mm jack. Whether that jack and the JST
   speaker output work at the same time is undocumented and untested.
-- **The listening channel is not confirmed.** `voice.py` uses capture channel 0.
-  Measurements in a silent room are consistent with that being the right one,
-  but it has not been A/B tested against real speech.
+- **The listening channel was wrong until 2026-09-16.** `voice.py` used capture
+  channel 0; measured against speech, channel 1 is clearly better and is now
+  the default. Based on one utterance across three recognisers, so worth
+  repeating.
 - **Speech models are not in git.** They live in `/home/arduino/models` and a
   rebuilt board needs them downloaded again.
 

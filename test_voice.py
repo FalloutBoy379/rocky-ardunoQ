@@ -10,15 +10,26 @@ from voice import (
 
 
 class ChannelTests(unittest.TestCase):
-    """The array delivers six interleaved channels; Rocky listens to one."""
+    """The array delivers six interleaved channels; Rocky listens to one.
 
-    def test_picks_the_processed_channel_from_interleaved_frames(self):
+    These name the channel they extract rather than leaning on the default, so
+    that retuning which channel Rocky listens to does not break tests about
+    de-interleaving, which is a separate concern.
+    """
+
+    def test_picks_the_named_channel_from_interleaved_frames(self):
         frames = struct.pack("<12h", 10, 1, 2, 3, 4, 5, 20, 1, 2, 3, 4, 5)
-        self.assertEqual(mono_channel(frames), struct.pack("<2h", 10, 20))
+        self.assertEqual(mono_channel(frames, channel=0), struct.pack("<2h", 10, 20))
+        self.assertEqual(mono_channel(frames, channel=1), struct.pack("<2h", 1, 1))
+        self.assertEqual(mono_channel(frames, channel=5), struct.pack("<2h", 5, 5))
 
     def test_a_partial_trailing_frame_is_dropped_not_misaligned(self):
         frames = struct.pack("<12h", 10, 1, 2, 3, 4, 5, 20, 1, 2, 3, 4, 5) + b"\x01\x02"
-        self.assertEqual(mono_channel(frames), struct.pack("<2h", 10, 20))
+        self.assertEqual(mono_channel(frames, channel=0), struct.pack("<2h", 10, 20))
+
+    def test_listens_to_a_processed_channel_not_a_raw_microphone(self):
+        """Channels 2 to 5 are the raw microphones and ship disabled."""
+        self.assertIn(voice.LISTEN_CHANNEL, (0, 1))
 
 
 class WakeWordTests(unittest.TestCase):

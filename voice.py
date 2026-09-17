@@ -2,7 +2,7 @@
 
 Three stages, run one at a time so Rocky never hears himself think:
 
-  listen  ALSA capture from the ReSpeaker array, channel 0 only, which is the
+  listen  ALSA capture from the ReSpeaker array, channel 1 only, which is the
           array's own echo-cancelled, beamformed output. Vosk turns it into
           text on the board, with no network. Vosk decides where an
           utterance ends.
@@ -33,7 +33,15 @@ import rocky
 
 RATE = 16000
 CAPTURE_CHANNELS = 6          # what the array's firmware offers
-LISTEN_CHANNEL = 0            # processed output; 2 to 5 are raw microphones
+# Channels 0 and 1 are both processed outputs; 2 to 5 are the raw microphones
+# and ship disabled, reading -75 dBFS. Measured on one desk utterance at equal
+# level (channel 0 RMS 1055, channel 1 RMS 971), channel 1 transcribed better
+# on all three recognisers here, while channel 0 mangled the second half of the
+# sentence every time:
+#   whisper    ch0 "Can I make clearly?"   ch1 "Can you hear me clearly?"
+#   moonshine  ch0 "Can I go make a..."    ch1 "can you hear me clearly"
+#   zipformer  ch0 "IN A YEAR MAC LIOL"    ch1 "CAN I HEAR ME CLEARLY"
+LISTEN_CHANNEL = 1
 FRAME_BYTES = 2 * CAPTURE_CHANNELS
 CHUNK_SECONDS = 0.1
 

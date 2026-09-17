@@ -40,11 +40,12 @@ or the microphone, not both.
 the board's only sound card:
 
 - Capture: 6 channels, 16 kHz, S16_LE. Channels 0 and 1 are the array's
-  processed outputs; 2 to 5 are the raw microphones and are disabled by default.
-  `voice.py` listens on channel 0. In a silent room channel 0 reads near zero
-  and channel 1 passes ambient, which is consistent with 0 being the
-  noise-suppressed ASR channel, but this has not been A/B tested against speech.
-  That test is worth doing.
+  processed outputs; 2 to 5 are the raw microphones, ship disabled, and read
+  about -75 dBFS. `voice.py` listens on **channel 1**, measured rather than
+  assumed: on one desk utterance at equal level, all three recognisers
+  transcribed channel 1 correctly and channel 0 mangled the back half of the
+  sentence. Worth repeating on more utterances, but three independent models
+  agreeing on one sample is reasonable evidence.
 - Playback: 2 channels, 16 kHz.
 - The onboard `ArduinoImolaHPH` codec no longer appears in `/proc/asound/cards`.
   Unexplained. It does not matter while the array is the output path, but it
