@@ -1,10 +1,27 @@
 # Rocky: a desk assistant on the Arduino UNO Q
 
 Rocky is a standalone conversational desk companion inspired by Project Hail
-Mary. Today he holds typed conversations using a model running entirely on the
-board. Speech is the next milestone.
+Mary. He listens through a four-microphone array, answers in his own voice, and
+remembers what matters between conversations.
 
-## Talk to Rocky
+## Talk to Rocky out loud
+
+On the board:
+
+```bash
+cd ~/rocky-bench && ./listen.sh
+```
+
+Say "Rocky" to get his attention, then talk normally. For about eight seconds
+after he finishes you can reply without saying his name again, because
+conversations have follow-ups. Speech recognition and synthesis both run on the
+board; only the language model uses the network.
+
+Audio goes in and out through the ReSpeaker array, never the board's own codec.
+That is not a preference: the array cancels echo only against audio it played
+itself, so routing his voice elsewhere makes him hear and answer himself.
+
+## Talk to Rocky by typing
 
 ```bash
 cd /home/ansh/Documents/ChatGPT/Rocky
@@ -20,7 +37,24 @@ This has been verified across a real reboot. If replies fail, see "When somethin
 Starting fresh on this project? Read `docs/HANDOFF.md` for current state,
 what is verified, and what to do next.
 
-## Talk to Rocky from a shell on the board
+## Talk to Rocky out loud
+
+On the board:
+
+```bash
+cd ~/rocky-bench && ./listen.sh
+```
+
+Say "Rocky" to get his attention, then talk normally. For about eight seconds
+after he finishes you can reply without saying his name again, because
+conversations have follow-ups. Speech recognition and synthesis both run on the
+board; only the language model uses the network.
+
+Audio goes in and out through the ReSpeaker array, never the board's own codec.
+That is not a preference: the array cancels echo only against audio it played
+itself, so routing his voice elsewhere makes him hear and answer himself.
+
+## Talk to Rocky by typing from a shell on the board
 
 Everything already runs on the UNO Q. `chat.sh` only opens a terminal there.
 To start Rocky from a shell on the board itself:
@@ -221,6 +255,17 @@ Run the tests on the laptop, no board required:
 python3 -m unittest test_rocky.py -v
 ```
 
+Check what Rocky chooses to remember, on the board:
+
+```bash
+ssh rocky 'cd ~/rocky-bench && set -a && . ~/.rocky-env && set +a \
+  && /home/arduino/rocky-venv/bin/python bench_memory.py'
+```
+
+Eleven fixed utterances, some worth keeping and some not, reported as decisions.
+Currently 11 of 11. Read the wording it saved as well as the score: a fact can
+be correctly saved and still be useless.
+
 Check how well Rocky holds his character, on the board:
 
 ```bash
@@ -286,9 +331,14 @@ system-wide installer. The archive retains its packaged `bin` and `lib` layout.
   graceful fallback between the two is not implemented.
 - **The API key sits in plaintext** in `~/.rocky-env` on the board. Anyone with
   a shell on Rocky has the key. Use a workspace-scoped key with a spend limit.
-- **No speech yet.** The ReSpeaker XVF3800 array has not been delivered. Whether
-  it arrives in USB audio mode or needs reflashing from I2S firmware is
-  unconfirmed and determines the first audio step.
+- **The Dayton speaker has never been driven.** All audio so far has gone
+  through headphones on the array's 3.5 mm jack. Whether that jack and the JST
+  speaker output work at the same time is undocumented and untested.
+- **The listening channel is not confirmed.** `voice.py` uses capture channel 0.
+  Measurements in a silent room are consistent with that being the right one,
+  but it has not been A/B tested against real speech.
+- **Speech models are not in git.** They live in `/home/arduino/models` and a
+  rebuilt board needs them downloaded again.
 
 ## Powering the board once the microphone is attached
 

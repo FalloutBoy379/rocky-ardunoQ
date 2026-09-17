@@ -1,16 +1,20 @@
 # Handoff
 
-Written 2026-09-12, at the point where the project moves from the Linux laptop
-to the Windows laptop that sits on the same network as the board.
+Written 2026-09-12, revised 2026-09-16 once the voice loop existed.
 
 Read `README.md` first for how to run things. This file covers what is true
 right now, what is trustworthy, and what to do next.
 
 ## Where the project is
 
-Rocky holds good text conversations. He has a personality that holds up, memory
-that survives restarts, and he is reachable over Wi-Fi from any machine with a
-key. No audio hardware is connected yet.
+**Rocky listens and speaks.** The microphone array is connected and working,
+speech recognition and synthesis both run on the board with no network, and
+conversations through headphones have been held. He has a personality that
+holds up, memory that survives restarts, and he is reachable over Wi-Fi from
+any machine with a key.
+
+Not yet done: the Dayton speaker has not been driven, there is no enclosure, and
+nothing physical (touch, LEDs, servo) exists.
 
 The goal is a Project Hail Mary desk companion, as a gift for Keval. The build
 order is: voice loop first, physical interaction and enclosure only once the
@@ -21,9 +25,9 @@ voice loop is reliable.
 | Part | State |
 | --- | --- |
 | Arduino UNO Q, 4 GB / 32 GB | Working. Debian 13, kernel 6.16.7, 4 cores. |
-| ReSpeaker Flex XVF3800, 4-mic | Not yet connected. Mode unconfirmed, see below. |
-| Dayton Audio DMA45-4 speaker | Not yet connected. |
-| Powered USB-C dongle | Not confirmed to exist. This is the blocker. |
+| ReSpeaker Flex XVF3800, 4-mic | Working. Enumerated as USB audio with no firmware change. |
+| Dayton Audio DMA45-4 speaker | Not yet driven. Headphones used so far. |
+| Powered USB-C dongle | In use. The board runs as a USB host through it. |
 
 **The single most important constraint.** The UNO Q has one USB-C port. It is
 currently the console *and* the board's power supply. The ReSpeaker needs that
@@ -32,11 +36,28 @@ in, so a USB-C dongle with power delivery passthrough is required (Arduino's
 docs exclude Apple dongles). Until that dongle exists, you can have the console
 or the microphone, not both.
 
-**Unconfirmed, and it decides the first audio step.** Seeed ships some XVF3800
-variants with I2S firmware rather than USB audio. Plug the array in and run
-`cat /proc/asound/cards` on the board. A second card next to `ArduinoImolaHPH`
-means it enumerated and you can record immediately. Only `ArduinoImolaHPH` means
-it needs reflashing with the USB firmware first.
+**Settled.** The array shipped in USB mode and needed no reflashing. It is now
+the board's only sound card:
+
+- Capture: 6 channels, 16 kHz, S16_LE. Channels 0 and 1 are the array's
+  processed outputs; 2 to 5 are the raw microphones and are disabled by default.
+  `voice.py` listens on channel 0. In a silent room channel 0 reads near zero
+  and channel 1 passes ambient, which is consistent with 0 being the
+  noise-suppressed ASR channel, but this has not been A/B tested against speech.
+  That test is worth doing.
+- Playback: 2 channels, 16 kHz.
+- The onboard `ArduinoImolaHPH` codec no longer appears in `/proc/asound/cards`.
+  Unexplained. It does not matter while the array is the output path, but it
+  would matter if the array were ever unplugged.
+
+The USB descriptors report `wTerminalType 0x0405 Echo-canceling speakerphone`
+on both terminals, which confirms from the device itself that its echo
+cancellation applies to audio played through it. Play Rocky's voice anywhere
+else and he will hear himself.
+
+Speech models live in `/home/arduino/models`: Silero VAD, sherpa-onnx streaming
+Zipformer in two sizes, Moonshine tiny, and Piper `en_US-ryan-low`. They are not
+in git; a rebuilt board needs them downloaded again.
 
 **Design reason the speaker hangs off the ReSpeaker**, not the board's own
 output: the XVF3800 cancels echo only against audio it played itself. Route the
@@ -77,14 +98,16 @@ Verified by running it:
 - Personality on `claude-haiku-4-5`: 7 of 7 replies in character, 1.0 to 1.9
   seconds warm. On `qwen2.5:0.5b`: 3 of 6, 2.3 to 3.0 seconds.
 
-**Not verified.** The `remember` tool round trip has never run against the live
-API. The tests cover the store and the command path, not Claude choosing to call
-the tool. This is the first thing to check.
+- The `remember` tool works end to end. It was verified in use, not just tested.
+- Memory judgement scores 11 of 11 on `bench_memory.py` after the tool
+  description was rewritten. It scored 10 of 11 before, and the live memory file
+  had been accumulating junk (the weather, twice, contradicting itself). The
+  fix was naming the excluded categories explicitly rather than describing them
+  abstractly.
 
-To check it: `./talk`, say something durable like "my sister is Priya", then
-`/memories` to see whether it saved. Then `/quit`, `./talk` again, and ask for
-your sister's name. That last step is the real test, because it proves the fact
-survived the process ending.
+**Not verified.** The Dayton speaker has never been driven; all audio so far has
+gone through headphones. Whether the 3.5 mm jack and the JST speaker output can
+be active simultaneously is undocumented by Seeed and untested.
 
 ## Things that will bite
 
@@ -108,12 +131,25 @@ survived the process ending.
 
 ## Open, in rough priority order
 
-1. Confirm the ReSpeaker enumerates, or reflash it. Blocked on the dongle.
-2. Verify the `remember` tool against the live API.
+1. Drive the Dayton speaker. It is 4 ohm, 10 W RMS, and the array's amplifier
+   does up to 10 W at 4 ohm, so full volume is the driver's limit with no
+   margin. Cap the volume in software. The 12 V external input is not needed:
+   at 79 dB per watt at one metre, a tenth of a watt is louder than
+   conversation.
+2. A/B channels 0 and 1 against real speech to confirm the listening channel.
 3. Password SSH is still enabled on the board, and an API key plus personal
    facts about Keval now sit in plaintext on it.
 4. No automatic fallback between the Claude and Ollama backends.
 5. Commits are authored `ansh@freeflysystems.com` on a public repo.
+
+## Enclosure numbers, for when that starts
+
+The DMA45-4 has Fs 151 Hz, Qts 0.56, Vas 0.003 ft3 (0.085 L). Standard sealed
+box maths on those gives about 0.14 L for a Qtc of 0.707, usable to roughly
+190 Hz; half a litre is smoother and slightly lower. Calculated here, not a
+Dayton recommendation, so model before cutting. Rocky needs a sealed volume of
+at least ~150 cm3 around the driver and no air leaks. Nothing below 150 Hz means
+his voice will sound thin, which for a small alien rock is arguably correct.
 
 ## Design decisions worth not relitigating
 

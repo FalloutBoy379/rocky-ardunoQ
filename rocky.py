@@ -139,10 +139,19 @@ REMEMBER_TOOL = {
         "Save one durable fact about the person you are talking to. Use this "
         "when they tell you something lasting about themselves, their "
         "preferences, their projects, or people in their life, and whenever "
-        "they ask you to remember something. Do not save passing "
-        "conversational detail, questions, or things that are only true right "
-        "now. Save one short fact per call, written so it still makes sense "
-        "read on its own months later."
+        "they ask you to remember something.\n"
+        "Never save any of these, even in passing:\n"
+        "- the weather, or anything about today\n"
+        "- how they feel right now, or how they slept\n"
+        "- what they are doing now, or might do later\n"
+        "- questions they asked you, or your own answers\n"
+        "- anything that could be different tomorrow\n"
+        "Before saving, ask whether the fact would still be worth knowing in a "
+        "year. If it would not, do not save it. When you are unsure, do not "
+        "save: a fact you miss costs nothing, and one you should not have kept "
+        "stays forever.\n"
+        "Save one short fact per call, naming the person, written so a "
+        "stranger reading it alone would understand it."
     ),
     "input_schema": {
         "type": "object",

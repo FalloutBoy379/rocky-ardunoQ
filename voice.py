@@ -2,7 +2,7 @@
 
 Three stages, run one at a time so Rocky never hears himself think:
 
-  listen  ALSA capture from the ReSpeaker array, channel 1 only, which is the
+  listen  ALSA capture from the ReSpeaker array, channel 0 only, which is the
           array's own echo-cancelled, beamformed output. Vosk turns it into
           text on the board, with no network. Vosk decides where an
           utterance ends.
